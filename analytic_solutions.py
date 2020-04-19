@@ -1,15 +1,14 @@
-#!/bin/env python
-
-# Library for analytic solutions.
+"""Library for analytic solutions."""
 
 import numpy as np
-from functools import update_wrapper
-from scipy.special import jv, struve, factorial as fac, gammaincc, hyp1f1, gamma
+from scipy.special import jv, factorial as fac, gammaincc, gamma, sici
 from mpmath import hyp1f2
 
+
 @np.vectorize
-def vhyp1f2(a0,b0,b1,x):
-    return complex(hyp1f2(a0,b0,b1,x))
+def vhyp1f2(a0, b0, b1, x):
+    """Vectorized hyp1f2 function."""
+    return complex(hyp1f2(a0, b0, b1, x))
 
 
 def approx_hyp1f1(a, b, x, order=5):
@@ -21,69 +20,88 @@ def approx_hyp1f1(a, b, x, order=5):
     a = a.flatten()
     first_term = gamma(b) * x**(a - b) * np.exp(-x) / gamma(a)
     ens = np.arange(order)[:, None]
-    second_term = (gamma(b) * x**(-a) / gamma(b-a))\
-        * np.sum(gamma(a+ens) * gamma(1 + a - b + ens)
-                 / (x**ens * gamma(ens + 1) * gamma(a) * gamma(1 + a - b))
-        , axis=0)
+    second_term = (gamma(b) * x**(-a) / gamma(b - a))\
+        * np.sum(gamma(a + ens) * gamma(1 + a - b + ens)
+                 / (x**ens * gamma(ens + 1) * gamma(a) * gamma(1 + a - b)), axis=0)
     return (first_term + second_term).reshape(outshape)
 
 
-def monopole(uamps):
+def monopole(uvecs):
     """
     Solution for I(r) = 1.
 
     Parameters
     ----------
-    uamps: ndarray of float
-        Baseline lengths in wavelengths.
+    uvecs: ndarray of float
+        cartesian baseline vectors in wavelengths, shape (Nbls, 3)
 
     Returns
     -------
     ndarray of complex
-        Visibilities corresponding with uamps.
+        Visibilities, shape (Nbls,)
     """
-    return 2*np.pi *  np.sinc(2*u)
+    uamps = np.linalg.norm(uvecs, axis=1)
+    return 2 * np.pi * np.sinc(2 * uamps)
 
-def cosza(uamps):
+
+def cosza(uvecs):
     """
     Solution for I(r) = cos(r).
 
     Parameters
     ----------
-    uamps: ndarray of float
-        Baseline lengths in wavelengths.
+    uvecs: ndarray of float
+        cartesian baseline vectors in wavelengths, shape (Nbls, 3)
 
     Returns
     -------
     ndarray of complex
-        Visibilities corresponding with uamps.
+        Visibilities, shape (Nbls,)
     """
-    return jv(1, 2 * np.pi * u) * 1 / u
+    uamps = np.linalg.norm(uvecs, axis=1)
+    return jv(1, 2 * np.pi * uamps) * 1 / uamps
 
-def quaddome(uamps):
+
+def polydome(uvecs, n=2):
     """
-    Solution for I(r) = 1-r^2.
+    Solution for I(r) = (1-r^n) * cos(zenith angle).
 
     Parameters
     ----------
-    uamps: ndarray of float
-        Baseline lengths in wavelengths.
+    uvecs: ndarray of float
+        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    n: int
+        Order of polynomial (Default of 2)
+        Must be even.
 
     Returns
     -------
     ndarray of complex
-        Visibilities corresponding with uamps.
+        Visibilities, shape (Nbls,)
     """
-    return (jv(1, 2 * np.pi * u) * 1 / u  - (jv(2, 2 * np.pi * u) - np.pi * u * jv(3, 2*np.pi*u)) * (1 / (np.pi * u**2)))
+    if not n % 2 == 0:
+        raise ValueError("Polynomial order must be even.")
+    uamps = np.linalg.norm(uvecs, axis=1)
 
-def projgauss(uamps, a, order=50, usesmall=False, uselarge=False):
+    # Special case:
+    if n == 2:
+        return (jv(1, 2 * np.pi * uamps) * 1 / uamps - (jv(2, 2 * np.pi * uamps)
+                - np.pi * uamps * jv(3, 2 * np.pi * uamps)) * (1 / (np.pi * uamps**2)))
+    # General
+    res = (1 / (n + 1)) * vhyp1f2(n + 1, 1, n + 2, -np.pi**2 * uamps**2)
+    res[uamps == 0] = 2 * np.pi * n / (2 * n + 2)
+    res = (jv(1, 2 * np.pi * uamps) * 1 / uamps) - res  # V_cosza - result
+    return res
+
+
+def projgauss(uvecs, a, order=50, usesmall=False, uselarge=False):
     """
     Solution for I(r) = exp(-r^2/2 a^2) * cos(r).
 
     Parameters
     ----------
-    uamps: ndarray of float
-        Baseline lengths in wavelengths.
+    uvecs: ndarray of float
+        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
     a: float
         Gaussian width parameter.
     order: int
@@ -98,32 +116,34 @@ def projgauss(uamps, a, order=50, usesmall=False, uselarge=False):
     Returns
     -------
     ndarray of complex
-        Visibilities corresponding with uamps.
+        Visibilities, shape (Nbls,)
     """
-    ks = np.arange(order)[None,:]
-    u = u[:, None]
+    uamps = np.linalg.norm(uvecs, axis=1)
+    ks = np.arange(order)[None, :]
+    uamps = uamps[:, None]
     if uselarge and usesmall:
         raise ValueError("Cannot use both small and large approximations at once")
     if (a < 0.25 and not uselarge) or usesmall:
-        return  np.pi * a**2 * (np.exp(- np.pi**2 * a**2 * u**2)
-               - np.sum( (-1)**ks * (np.pi * u * a)**(2*ks) * gammaincc(ks+1, 1/a**2)
-                         / (fac(ks))**2, axis=1))
+        return np.pi * a**2 * (
+            np.exp(- np.pi**2 * a**2 * uamps**2)
+            - np.sum(
+                (-1)**ks * (np.pi * uamps * a)**(2 * ks) * gammaincc(ks + 1, 1 / a**2)
+                / (fac(ks))**2, axis=1
+            )
+        )
     else:
-        return  np.sum(np.pi * (-1)**ks * vhyp1f2(1+ks, 1, 2+ks, -np.pi**2 * u**2)
-                           / (a**(2*ks) * fac(ks+1)), axis=1)
+        return np.sum(np.pi * (-1)**ks * vhyp1f2(1 + ks, 1, 2 + ks, -np.pi**2 * uamps**2)
+                      / (a**(2 * ks) * fac(ks + 1)), axis=1)
 
-def gauss(uamps=None, uvecs=None, a=None, el0vec=None, order=10, usesmall=False, uselarge=False):
+
+def gauss(uvecs, a, el0vec=None, order=10, usesmall=False, uselarge=False, hyporder=5):
     """
     Solution for I(r) = exp(-r^2/2 a^2).
 
     Parameters
     ----------
-    uamps: ndarray of float
-        Baseline lengths in wavelengths., shape (Nbls,) for Nbls baselines.
     uvecs: ndarray of float
         Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
-        Overrides uamps if set.
-        Required if el0vec is not None.
     a: float
         Gaussian width parameter.
     el0vec: ndarray of float
@@ -136,14 +156,17 @@ def gauss(uamps=None, uvecs=None, a=None, el0vec=None, order=10, usesmall=False,
     uselarge: bool, optional
         Use large-a approximation, regardless of a.
         Default is False
+    hyporder: int, optional
+        Expansion order for hypergeometric 1F1 function evaluation.
+        Default is 5.
 
     Returns
     -------
     ndarray of complex
-        Visibilities corresponding with uamps.
+        Visibilities, shape (Nbls,)
     """
+    uamps = np.linalg.norm(uvecs, axis=1)
     if el0vec is not None:
-        assert uvecs is not None
         udotel0 = np.dot(uvecs, el0vec)
         el0 = np.linalg.norm(el0vec)
         el0_x = (udotel0.T / uamps).T
@@ -151,24 +174,71 @@ def gauss(uamps=None, uvecs=None, a=None, el0vec=None, order=10, usesmall=False,
         el0_x = 0
         el0 = 0
 
-    u_in_series = np.sqrt(uamps**2  - el0**2/a**4 + 2j * uamps * el0_x / a**2)
-    u = uamps
+    u_in_series = np.sqrt(uamps**2 - el0**2 / a**4 + 2j * uamps * el0_x / a**2)
+    uamps = uamps[:, None]
 
     ks = np.arange(order)[None, :]
     v = u_in_series[:, None]
-    u = u[:, None]
 
-    if (a < np.pi/8 and not uselarge) or usesmall:
-        phasor = np.exp(-2 * np.pi * 1j * udotel0) * np.exp(-np.pi * a**2 * u**2)
-        hypterms = approx_hyp1f1(ks + 1, 3/2, -np.pi / a**2)
-        series = (np.sqrt(np.pi) * v * a)**(2*ks) / gamma(ks + 1)
-        return (phasor *  2*np.pi * np.sum(series * hypterms, axis=1)).squeeze()
+    if (a < np.pi / 8 and not uselarge) or usesmall:
+        phasor = np.exp(-2 * np.pi * 1j * udotel0) * np.exp(-np.pi * a**2 * uamps**2)
+        hypterms = approx_hyp1f1(ks + 1, 3 / 2, -np.pi / a**2, order=hyporder)
+        series = (np.sqrt(np.pi) * v * a)**(2 * ks) / gamma(ks + 1)
+        return (phasor * 2 * np.pi * np.sum(series * hypterms, axis=1)).squeeze()
     else:
         # order >= 40
-        phasor = np.exp(-np.pi * el0**2/a**2)
-        ks = np.arange(order)[:,None]
-        v = u_in_series[None,:]
-        hypterms = vhyp1f2(ks + 1, 1, ks + 3/2, -np.pi**2 * v**2)
-        ksum = np.sum((-1)**ks * (np.pi/a**2)**ks * hypterms / gamma(ks + 3/2), axis=1)
-        res = phasor *  np.pi**(3/2) * ksum
+        phasor = np.exp(-np.pi * el0**2 / a**2)
+        ks = np.arange(order)[:, None]
+        v = u_in_series[None, :]
+        hypterms = vhyp1f2(ks + 1, 1, ks + 3 / 2, -np.pi**2 * v**2)
+        ksum = np.sum((-1)**ks * (np.pi / a**2)**ks * hypterms / gamma(ks + 3 / 2), axis=1)
+        res = phasor * np.pi**(3 / 2) * ksum
         return res.squeeze()
+
+
+def xysincs(uvecs, a, xi=0.0):
+    """
+    Solution for the xysincs model, defined as:
+        I(x,y) = sinc(ax) sinc(ay) cos(1 - x^2 - y^2), for |x| and |y| < 1/sqrt(2)
+               = 0, otherwise
+
+        where (x,y) is rotated from (l,m) by an angle xi.
+
+    In UV space, this resembles a rotated square.
+
+    Parameters
+    ----------
+    uvecs: ndarray of float
+        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    a: float
+        Sinc parameter, giving width of the "box" in uv space.
+        box width in UV is a/(2 pi)
+    xi: float
+        Rotation of (x,y) coordinates from (l,m) in radians.
+
+    Returns
+    -------
+    ndarray of complex
+        Visibilities, shape (Nbls,)
+    """
+
+    assert np.allclose(uvecs[:,2], 0)
+    cx, sx = np.cos(xi), np.sin(xi)
+    rot = np.array([[cx, sx, 0],[-sx, cx, 0], [0, 0, 1]])
+
+    xyvecs = np.dot(uvecs, rot)
+
+    x = 2 * np.pi * xyvecs[:, 0]
+    y = 2 * np.pi * xyvecs[:, 1]
+
+    x = x.astype(complex)
+    y = y.astype(complex)
+
+    b = 1 / np.sqrt(2.0)
+
+    xfac = (np.sign(a - x) - np.sign(a - x)) * np.pi / 2
+    yfac = (np.sign(a - y) - np.sign(a - y)) * np.pi / 2
+    xpart = (sici(b * (a - x))[0] + sici(b * (a + x))[0] + xfac) / a
+    ypart = (sici(b * (a - y))[0] + sici(b * (a + y))[0] + yfac) / a
+
+    return ypart * xpart
