@@ -2,7 +2,7 @@
 
 import numpy as np
 import re
-from scipy.special import jv, factorial as fac, gammaincc, gamma, sici
+from scipy.special import jv, factorial as fac, gammaincc, gamma, sici, hyp0f1
 from mpmath import hyp1f2
 
 
@@ -27,22 +27,34 @@ def approx_hyp1f1(a, b, x, order=5):
     return (first_term + second_term).reshape(outshape)
 
 
-def monopole(uvecs):
+def monopole(uvecs, order=3):
     """
     Solution for I(r) = 1.
+
+    Also handles nonzero-w case.
 
     Parameters
     ----------
     uvecs: ndarray of float
         cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    order: int
+        Expansion order to use for nonflat array case (w != 0).
 
     Returns
     -------
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    uamps = np.linalg.norm(uvecs, axis=1)
-    return 2 * np.pi * np.sinc(2 * uamps)
+    if np.allclose(uvecs[:, 2], 0):
+        uamps = np.linalg.norm(uvecs, axis=1)
+        return 2 * np.pi * np.sinc(2 * uamps)
+
+    uvecs = uvecs[..., None]
+
+    ks = np.arange(order)[None, :]
+    fac0 = (2 * np.pi * 1j * uvecs[:, 2, :])**ks / (gamma(ks + 2))
+    fac1 = hyp0f1((3 + ks) / 2, -np.pi**2 * (uvecs[:, 0, :]**2 + uvecs[:, 1, :]**2))
+    return 2 * np.pi * np.sum(fac0 * fac1, axis=-1)
 
 
 def cosza(uvecs):
