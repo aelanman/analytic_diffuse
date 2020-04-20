@@ -1,6 +1,7 @@
 """Library for analytic solutions."""
 
 import numpy as np
+import re
 from scipy.special import jv, factorial as fac, gammaincc, gamma, sici
 from mpmath import hyp1f2
 
@@ -171,25 +172,27 @@ def gauss(uvecs, a, el0vec=None, order=10, usesmall=False, uselarge=False, hypor
         el0 = np.linalg.norm(el0vec)
         el0_x = (udotel0.T / uamps).T
     else:
+        udotel0 = 0.0
         el0_x = 0
         el0 = 0
 
     u_in_series = np.sqrt(uamps**2 - el0**2 / a**4 + 2j * uamps * el0_x / a**2)
-    uamps = uamps[:, None]
 
-    ks = np.arange(order)[None, :]
-    v = u_in_series[:, None]
-
+    ks = np.arange(order)
+    v = u_in_series
     if (a < np.pi / 8 and not uselarge) or usesmall:
         phasor = np.exp(-2 * np.pi * 1j * udotel0) * np.exp(-np.pi * a**2 * uamps**2)
         hypterms = approx_hyp1f1(ks + 1, 3 / 2, -np.pi / a**2, order=hyporder)
+        ks = ks[None, :]
+        v = v[:, None]
+        hypterms = hypterms[None, :]
         series = (np.sqrt(np.pi) * v * a)**(2 * ks) / gamma(ks + 1)
-        return (phasor * 2 * np.pi * np.sum(series * hypterms, axis=1)).squeeze()
+        return (2 * np.pi * phasor * np.sum(series * hypterms, axis=1)).squeeze()
     else:
         # order >= 40
         phasor = np.exp(-np.pi * el0**2 / a**2)
-        ks = np.arange(order)[:, None]
-        v = u_in_series[None, :]
+        v = v[:, None]
+        ks = ks[None, :]
         hypterms = vhyp1f2(ks + 1, 1, ks + 3 / 2, -np.pi**2 * v**2)
         ksum = np.sum((-1)**ks * (np.pi / a**2)**ks * hypterms / gamma(ks + 3 / 2), axis=1)
         res = phasor * np.pi**(3 / 2) * ksum
@@ -198,7 +201,9 @@ def gauss(uvecs, a, el0vec=None, order=10, usesmall=False, uselarge=False, hypor
 
 def xysincs(uvecs, a, xi=0.0):
     """
-    Solution for the xysincs model, defined as:
+    Solution for the xysincs model.
+
+    Defined as:
         I(x,y) = sinc(ax) sinc(ay) cos(1 - x^2 - y^2), for |x| and |y| < 1/sqrt(2)
                = 0, otherwise
 
@@ -221,10 +226,9 @@ def xysincs(uvecs, a, xi=0.0):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-
-    assert np.allclose(uvecs[:,2], 0)
+    assert np.allclose(uvecs[:, 2], 0)
     cx, sx = np.cos(xi), np.sin(xi)
-    rot = np.array([[cx, sx, 0],[-sx, cx, 0], [0, 0, 1]])
+    rot = np.array([[cx, sx, 0], [-sx, cx, 0], [0, 0, 1]])
 
     xyvecs = np.dot(uvecs, rot)
 
@@ -242,3 +246,39 @@ def xysincs(uvecs, a, xi=0.0):
     ypart = (sici(b * (a - y))[0] + sici(b * (a + y))[0] + yfac) / a
 
     return ypart * xpart
+
+
+def parse_filename(fname):
+    """
+    Interpret model and other parameters from filename.
+
+    Current healvis simulations of these models follow a particular
+    naming convention. See example files in data directory.
+    """
+    params = {}
+    if 'monopole' in fname:
+        sky = 'monopole'
+    elif 'cosza' in fname:
+        sky = 'cosza'
+    elif 'quaddome' in fname:
+        sky = 'polydome'
+        params['n'] = 2
+    elif 'projgauss' in fname:
+        sky = 'projgauss'
+        params['a'] = float(re.search(r'(?<=gauss-)\d*\.?\d*', fname).group(0))
+    elif 'fullgauss' in fname:
+        sky = 'gauss'
+        params['a'] = float(re.search(r'(?<=gauss-)\d*\.?\d*', fname).group(0))
+        if 'offzen' in fname:
+            zenang = np.radians(5.0)
+            if 'small-offzen' in fname:
+                zenang = np.radians(0.5)
+            params['el0vec'] = np.array([np.sin(zenang), 0, 0])
+    elif 'xysincs' in fname:
+        sky = 'xysincs'
+        params['xi'] = np.pi / 4
+        params['a'] = float(re.search(r'(?<=-a)\d*\.?\d*', fname).group(0))
+    else:
+        raise ValueError("No existing model found for {}".format(fname))
+
+    return sky, params

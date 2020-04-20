@@ -3,10 +3,14 @@
 import numpy as np
 from functools import wraps
 
+_funcnames = []
+
 
 def checkinput(func):
     """Enforce input shapes and horizon cutoff."""
+    global _funcnames
 
+    _funcnames.append(func.__name__)
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Check validity of input shapes
@@ -26,6 +30,7 @@ def checkinput(func):
 
 
 def _angle_to_lmn(phi, theta):
+    phi, theta = np.atleast_1d(phi), np.atleast_1d(theta)
     lmn = np.zeros((len(phi), 3), dtype=float)
     lmn[:, 0] = np.sin(phi) * np.sin(theta)
     lmn[:, 1] = np.cos(phi) * np.sin(theta)

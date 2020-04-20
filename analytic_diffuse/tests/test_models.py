@@ -3,7 +3,7 @@ import h5py
 import os
 import pytest
 
-from analytic_diffuse import models
+from analytic_diffuse import get_model
 from analytic_diffuse.data import DATA_PATH
 
 from healvis.observatory import Observatory
@@ -24,9 +24,10 @@ names = ['cosza', 'polydome', 'projgauss', 'gauss', 'xysincs']
 params = [{}, {'n': 2}, {'a': 0.5}, {'a': 0.5}, {'a': 64, 'xi': np.pi / 4}]
 keys = ['cosza', 'quaddome', 'projgauss-0.5', 'fullgauss-0.50', 'xysincs-a64']
 
+
 @pytest.mark.parametrize('mod, param, key', zip(names, params, keys))
 def test_against_data(mod, param, key):
-    analytic = getattr(models, mod)
+    analytic = get_model(mod)
     test0 = analytic(phi, theta, **param)
     fname = 'analytic_test_model_' + key + '_nside' + str(nside) + '.hdf5'
     f0 = h5py.File(os.path.join(DATA_PATH, fname), 'r')
