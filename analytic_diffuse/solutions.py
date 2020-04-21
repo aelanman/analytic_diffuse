@@ -107,7 +107,7 @@ def polydome(uvecs, n=2):
     return res
 
 
-def projgauss(uvecs, a, order=50, usesmall=False, uselarge=False):
+def projgauss(uvecs, a, order=30, usesmall=False, uselarge=False):
     """
     Solution for I(r) = exp(-r^2/2 a^2) * cos(r).
 
@@ -138,7 +138,7 @@ def projgauss(uvecs, a, order=50, usesmall=False, uselarge=False):
         raise ValueError("Cannot use both small and large approximations at once")
     if (a < 0.25 and not uselarge) or usesmall:
         return np.pi * a**2 * (
-            np.exp(- np.pi**2 * a**2 * uamps**2)
+            np.exp(- np.pi**2 * a**2 * uamps[:,0]**2)
             - np.sum(
                 (-1)**ks * (np.pi * uamps * a)**(2 * ks) * gammaincc(ks + 1, 1 / a**2)
                 / (fac(ks))**2, axis=1

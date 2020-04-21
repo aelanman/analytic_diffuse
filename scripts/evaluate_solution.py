@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('-v', '--visfile', type=str, help='pyuvdata-compatible visibility data file')
+parser.add_argument('--infile', type=str, help='Input npz file containing uvw vectors')
 helpstr = 'Model name. Available: ' + ', '.join(andiff.available_models)
 parser.add_argument('--model', type=str, help=helpstr, default=None)
 parser.add_argument('-a', type=float, help='a parameter for gaussian and xysincs models.', default=None)
@@ -42,11 +43,23 @@ if args.el0ang is not None:
         args.el0vec = andiff.models._angle_to_lmn(*args.el0ang).squeeze()
         args.el0vec[2] = 0   # Scrap w component
 
+outdict = {}
+
+sel = slice(None)
+if args.maxu is not None:
+    sel = np.linalg.norm(uvw, axis=1) < args.maxu
 
 uv = UVData()
 if args.visfile is None:
     if args.model is None:
         raise ValueError("Model type needed.")
+    if args.infile is None:
+        raise ValueError("Input npz file needed.")
+    f = np.load(args.infile)
+    uvw = f['uvws']
+    uvw = uvw[sel]
+elif args.visfile is not None and args.infile is not None:
+    raise ValueError("Cannot do both npz and uv input files at once.")
 else:
     uv.read(args.visfile)
     print("Using visibility file {}".format(args.visfile))
@@ -59,22 +72,18 @@ else:
     uvw = np.swapaxes((uvw/lam), 1,2)
     uvw = uvw.reshape((uv.Nbls * uv.Nfreqs, 3))
     dat_Tsr = dat_Tsr.flatten()
-    if args.maxu is not None:
-        sel = np.linalg.norm(uvw, axis=1) < args.maxu
-        uvw = uvw[sel]
-        dat_Tsr = dat_Tsr[sel]
+    uvw = uvw[sel]
+    dat_Tsr = dat_Tsr[sel]
     if args.model is None:
         model, params = andiff.solutions.parse_filename(os.path.basename(args.visfile))
         args.model = model
         for k, v in params.items():
             if (hasattr(args, k)) and (getattr(args, k) is None):
                 setattr(args, k, v)
+    outdict['dat_Tsr'] = dat_Tsr
 
-
-outdict = {}
 
 outdict['uvws'] = uvw
-outdict['dat_Tsr'] = dat_Tsr
 
 for key, val in vars(args).items():
     if val is not None:
@@ -103,7 +112,10 @@ else:
     outdict['result'] = args.amp * analytic(uvw, **params)
 
 if args.ofname is None:
-    args.ofname = "ana_comp_"+args.model
+    if args.infile is None:
+        args.ofname = "ana_comp_"+args.model
+    else:
+        args.ofname = "ana_eval_"+args.model    # Comp for data comp, eval for just evaluation
     for k, val in params.items():
         if isinstance(val, int):
             args.ofname += '_{}{:d}'.format(k, val)
