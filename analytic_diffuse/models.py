@@ -16,7 +16,7 @@ def checkinput(func):
         # Check validity of input shapes
         phi = args[0]
         theta = args[1]
-        if not phi.shape == theta.shape:
+        if theta and phi.shape != theta.shape:
             raise ValueError(
                 "phi and theta must have the same shape: {}, {}".format(
                     str(phi.shape), str(theta.shape)
@@ -50,7 +50,7 @@ def monopole(phi, theta):
     theta: ndarray of float
         Zenith angle in radians, shape (Npixels,)
     """
-    return np.ones_like(phi)
+    return np.ones_like(theta)
 
 
 @checkinput
@@ -83,7 +83,7 @@ def polydome(phi, theta, n=2):
         Order of polynomial (Default of 2)
         Must be even.
     """
-    if not n % 2 == 0:
+    if n % 2 != 0:
         raise ValueError("Polynomial order must be even.")
     return np.cos(theta) * (1 - np.sin(theta)**n)
 
@@ -126,7 +126,7 @@ def gauss(phi, theta, a, el0vec=None):
 
     sigsq = a**2 / (2 * np.pi)
     lmn = _angle_to_lmn(phi, theta)
-    disp = (lmn - el0vec)[:, :2]  # Only l an m
+    disp = (lmn - el0vec)[:, :2]  # Only l and m
     ang = np.linalg.norm(disp, axis=1)
     return np.exp(-ang**2 / (2 * sigsq))
 
