@@ -27,6 +27,14 @@ def approx_hyp1f1(a, b, x, order=5):
     return (first_term + second_term).reshape(outshape)
 
 
+def vec_to_amp(vec):
+    vec = np.array(vec)
+    assert vec.ndim in (1, 2)
+    if vec.ndim == 2:
+        assert vec.shape[1] <= 3
+    return vec if vec.ndim == 1 else np.linalg.norm(vec, axis=1)
+
+
 def monopole(uvecs, order=3):
     """
     Solution for I(r) = 1.
@@ -45,8 +53,10 @@ def monopole(uvecs, order=3):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    if np.allclose(uvecs[:, 2], 0):
-        uamps = np.linalg.norm(uvecs, axis=1)
+
+    if uvecs.ndim == 1 or uvecs.shape[1] == 2 or np.allclose(uvecs[:, 2], 0):
+        # w is zero.
+        uamps = vec_to_amp(uvecs)
         return 2 * np.pi * np.sinc(2 * uamps)
 
     uvecs = uvecs[..., None]
@@ -71,7 +81,7 @@ def cosza(uvecs):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    uamps = np.linalg.norm(uvecs, axis=1)
+    uamps = vec_to_amp(uvecs)
     return jv(1, 2 * np.pi * uamps) * 1 / uamps
 
 
@@ -92,9 +102,9 @@ def polydome(uvecs, n=2):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    if not n % 2 == 0:
+    if n % 2:
         raise ValueError("Polynomial order must be even.")
-    uamps = np.linalg.norm(uvecs, axis=1)
+    uamps = vec_to_amp(uvecs)
 
     # Special case:
     if n == 2:
@@ -131,7 +141,7 @@ def projgauss(uvecs, a, order=30, usesmall=False, uselarge=False):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    uamps = np.linalg.norm(uvecs, axis=1)
+    uamps = vec_to_amp(uvecs)
     ks = np.arange(order)[None, :]
     uamps = uamps[:, None]
     if uselarge and usesmall:
@@ -178,7 +188,7 @@ def gauss(uvecs, a, el0vec=None, order=10, usesmall=False, uselarge=False, hypor
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
-    uamps = np.linalg.norm(uvecs, axis=1)
+    uamps = vec_to_amp(uvecs)
     if el0vec is not None:
         udotel0 = np.dot(uvecs, el0vec)
         el0 = np.linalg.norm(el0vec)
@@ -238,6 +248,7 @@ def xysincs(uvecs, a, xi=0.0):
     ndarray of complex
         Visibilities, shape (Nbls,)
     """
+    assert uvecs.ndim == 2 and uvecs.shape[1] == 3
     assert np.allclose(uvecs[:, 2], 0)
     cx, sx = np.cos(xi), np.sin(xi)
     rot = np.array([[cx, sx, 0], [-sx, cx, 0], [0, 0, 1]])

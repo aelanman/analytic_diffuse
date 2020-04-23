@@ -15,16 +15,27 @@ def checkinput(func):
     def wrapper(*args, **kwargs):
         # Check validity of input shapes
         phi = args[0]
-        theta = args[1]
-        if theta and phi.shape != theta.shape:
+        # Check whether input was scalar.
+        scalar = np.isscalar(args[1])
+        theta = np.atleast_1d(args[1])
+        if phi is not None:
+            phi = np.atleast_1d(phi)
+
+
+        if phi is not None and phi.shape != theta.shape:
             raise ValueError(
                 "phi and theta must have the same shape: {}, {}".format(
                     str(phi.shape), str(theta.shape)
                 )
             )
-        result = func(*args, **kwargs)
+        result = func(phi, theta, *args[2:], **kwargs)
         # Set pixels outside the horizon to zero.
-        result[theta > np.pi / 2] *= 0
+        result[theta > np.pi / 2] = 0
+
+        # If a scalar was passed in, return a scalar.
+        if scalar:
+            return result[0]
+
         return result
     return wrapper
 
