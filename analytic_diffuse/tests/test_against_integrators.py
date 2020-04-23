@@ -7,7 +7,9 @@ import numpy as np
     'model,kwargs',
     [('cosza', {}),
      ('polydome', {}),
-     ('projgauss', {'a': 0.01})]
+     ('projgauss', {'a': 0.01}),
+     ('projgauss', {'a': 2}),
+     ]
 )
 def test_against_hankel(model, kwargs):
     u = np.array([0.1, 1, 10, 100])
