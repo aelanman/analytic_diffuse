@@ -49,8 +49,6 @@ def hankel_solver(model: [callable, str], u: [float, np.ndarray], quad_kwargs={}
     else:
         res = [quad(integrand, 0, 1, args=(uu), points=p, **quad_kwargs)[0] for uu, p in zip(u, points)]
 
-    print(scalar, res)
-
     if scalar:
         return res[0]
     else:

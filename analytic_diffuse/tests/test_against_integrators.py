@@ -22,7 +22,7 @@ def test_against_hankel(model, kwargs):
     assert np.allclose(anl, num, rtol=1e-8)
 
 
-@pytest.mark.parametrize('a', (0.25, 0.5))  # 0.2 doesn't seem to work for u=10, 100 (numerical or analytic)
+@pytest.mark.parametrize('a', (0.1, 0.25, 0.5))  # 0.2 doesn't seem to work for u=10, 100 (numerical or analytic)
 def test_projgauss_mid_a(a):
     u = np.array([0.1, 1, 10, 100])
 
