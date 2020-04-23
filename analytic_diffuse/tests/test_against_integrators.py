@@ -7,12 +7,12 @@ import numpy as np
     'model,kwargs',
     [('cosza', {}),
      ('polydome', {}),
-     ('projgauss', {'a':0.2})]
+     ('projgauss', {'a': 0.01})]
 )
 def test_against_hankel(model, kwargs):
-    u = np.array([0.1, 1])
+    u = np.array([0.1, 1, 10, 100])
 
     anl = get_solution(model)(u, **kwargs)
-    num = integrators.hankel_solver(model, u, quad_kwargs=dict(epsabs=0, epsrel=1e-8), **kwargs)[0]
+    num = integrators.hankel_solver(model, u, quad_kwargs=dict(epsabs=0, limit=100, epsrel=1e-8),  **kwargs)[0]
 
     assert np.allclose(anl, num, rtol=1e-8)
