@@ -14,5 +14,13 @@ def hankel_solver(model: [callable, str], u: [float, np.ndarray], quad_kwargs={}
         phi = np.arcsin(r)  # using phi here because that's what we use in the paper, though in models.py it's theta
         return 2*np.pi * r * model(None, phi, *args, **kwargs) / np.cos(phi) * j0(2*np.pi* uu *r)
 
+    scalar = np.isscalar(u)
+    u = np.atleast_1d(u)
     res = [quad(integrand, 0, 1, args=(uu), **quad_kwargs) for uu in u]
-    return [r[0] for r in res], [r[1:] for r in res]
+
+    res, info = [r[0] for r in res], [r[1:] for r in res]
+
+    if scalar:
+        return res[0], info[0]
+    else:
+        return res, info
