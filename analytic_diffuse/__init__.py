@@ -19,7 +19,7 @@ def get_model(name):
         Callable function.
     """
     if name not in available_models:
-        raise ValueError("Model {} is not available".format(name))
+        raise ValueError(f"Model {name} is not available")
 
     return getattr(models, name)
 
@@ -39,6 +39,6 @@ def get_solution(name):
         Callable function.
     """
     if name not in available_models:
-        raise ValueError("Solution {} is not available".format(name))
+        raise ValueError(f"Solution {name} is not available")
 
     return getattr(solutions, name)
