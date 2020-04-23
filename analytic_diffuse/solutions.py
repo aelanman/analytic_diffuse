@@ -35,7 +35,7 @@ def vec_to_amp(vec):
     return vec if vec.ndim == 1 else np.linalg.norm(vec, axis=1)
 
 
-def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, *args):
+def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, complex, *args):
     # Set the default order (100 if we're going to convergence, 30 otherwise)
     order = order or (100 if chunk_order else 30)
 
@@ -52,10 +52,9 @@ def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, 
     # Now set the actual order (>= original order)
     order = n_chunks * chunk_order
 
-    sm = np.zeros(u.shape + (order, ))
+    sm = np.zeros(u.shape + (order, ), dtype=np.complex if complex else np.float)
     u = u[..., None]
 
-    print('shapes: ', sm.shape, u.shape, sm[..., 0][..., None].shape)
     counter = 0
     while (
         counter < 2 or not np.allclose(sm[..., counter-1], sm[..., counter-2], atol=atol, rtol=rtol)) and counter < order:
@@ -205,8 +204,7 @@ def projgauss(uvecs, a, order=None, chunk_order=0, usesmall=False, uselarge=Fals
             / (a**(2 * ks) * fac(ks + 1))
         )
 
-    result = _perform_convergent_sum(fnc, u_amps, order, chunk_order, atol, rtol, ret_cumsum)
-    print(result.shape)
+    result = _perform_convergent_sum(fnc, u_amps, order, chunk_order, atol, rtol, ret_cumsum, complex=False)
 
     if usesmall:
         exp = np.exp(-(np.pi * a * u_amps) ** 2)
@@ -271,7 +269,7 @@ def gauss(uvecs, a, el0vec=None, order=None, chunk_order=0, usesmall=False, usel
             hypterms = vhyp1f2(ks + 1, 1, ks + 3 / 2, -np.pi**2 * v**2)
             return (-1)**ks * (np.pi / a**2)**ks * hypterms / gamma(ks + 3 / 2)
 
-    result = _perform_convergent_sum(fnc, u_in_series, order, chunk_order, atol, rtol, ret_cumsum)
+    result = _perform_convergent_sum(fnc, u_in_series, order, chunk_order, atol, rtol, ret_cumsum, complex=True)
 
     if usesmall:
         phasor = np.exp(-2 * np.pi * 1j * udotel0) * np.exp(-np.pi * a ** 2 * u_amps ** 2)

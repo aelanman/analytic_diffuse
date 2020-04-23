@@ -2,8 +2,10 @@
 
 import numpy as np
 from functools import wraps
+import mpmath as mp
 
 _funcnames = []
+_projected_funcs = []
 
 
 def checkinput(func):
@@ -17,24 +19,51 @@ def checkinput(func):
         phi = args[0]
         # Check whether input was scalar.
         scalar = np.isscalar(args[1])
-        theta = np.atleast_1d(args[1])
-        if phi is not None:
-            phi = np.atleast_1d(phi)
 
+        theta = args[1]
 
-        if phi is not None and phi.shape != theta.shape:
+        if not scalar:
+            theta = np.array(theta)
+            if phi is not None:
+                phi = np.array(phi)
+
+        if scalar and theta > np.pi/2:
+            return 0
+
+        if phi is not None and not scalar and phi.shape != theta.shape:
             raise ValueError(
                 "phi and theta must have the same shape: {}, {}".format(
                     str(phi.shape), str(theta.shape)
                 )
             )
         result = func(phi, theta, *args[2:], **kwargs)
+
         # Set pixels outside the horizon to zero.
-        result[theta > np.pi / 2] = 0
+        if not scalar:
+            result[theta > np.pi / 2] = 0
 
         # If a scalar was passed in, return a scalar.
-        if scalar:
-            return result[0]
+        return result
+    return wrapper
+
+
+def projected(func):
+    """Enforce input shapes and horizon cutoff."""
+    global _projected_funcs
+
+    _projected_funcs.append(func.__name__)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        projected = kwargs.pop('projected', False)
+
+        result = func(*args, **kwargs)
+
+        if not projected:
+            try:
+                result *= np.cos(args[1])
+            except AttributeError:
+                result *= mp.cos(args[1])
 
         return result
     return wrapper
@@ -64,6 +93,7 @@ def monopole(phi, theta):
     return np.ones_like(theta)
 
 
+@projected
 @checkinput
 def cosza(phi, theta):
     """
@@ -76,9 +106,10 @@ def cosza(phi, theta):
     theta: ndarray of float
         Zenith angle in radians, shape (Npixels,)
     """
-    return np.cos(theta)
+    return np.ones_like(theta)
 
 
+@projected
 @checkinput
 def polydome(phi, theta, n=2):
     """
@@ -96,9 +127,12 @@ def polydome(phi, theta, n=2):
     """
     if n % 2 != 0:
         raise ValueError("Polynomial order must be even.")
-    return np.cos(theta) * (1 - np.sin(theta)**n)
+    try:
+        return 1 - np.sin(theta) ** n
+    except AttributeError:
+        return 1 - mp.sin(theta) ** n
 
-
+@projected
 @checkinput
 def projgauss(phi, theta, a):
     """
@@ -113,8 +147,10 @@ def projgauss(phi, theta, a):
     a: float
         Gaussian width parameter.
     """
-    return np.exp(-np.sin(theta)**2 / a**2) * np.cos(theta)
-
+    try:
+        return np.exp(-np.sin(theta)**2 / a**2)
+    except AttributeError:
+        return mp.exp(-mp.sin(theta) ** 2 / a ** 2)
 
 @checkinput
 def gauss(phi, theta, a, el0vec=None):
@@ -132,6 +168,9 @@ def gauss(phi, theta, a, el0vec=None):
     el0vec: ndarray of float
         Cartesian vector describing lmn displacement of Gaussian center, shape (3,).
     """
+    if phi is None:
+        phi = np.zeros_like(theta)
+
     if el0vec is None:
         el0vec = np.array([0, 0, 0])
 
@@ -139,7 +178,10 @@ def gauss(phi, theta, a, el0vec=None):
     lmn = _angle_to_lmn(phi, theta)
     disp = (lmn - el0vec)[:, :2]  # Only l and m
     ang = np.linalg.norm(disp, axis=1)
-    return np.exp(-ang**2 / (2 * sigsq))
+    try:
+        return np.exp(-ang**2 / (2 * sigsq))
+    except AttributeError:
+        return mp.exp(-ang ** 2 / (2 * sigsq))
 
 
 @checkinput
