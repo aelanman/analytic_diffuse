@@ -1,7 +1,7 @@
 from . import models
 from . import solutions
 
-from .models import _funcnames as available_models
+from .models import sky_models as available_models
 
 
 def get_model(name):

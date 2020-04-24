@@ -5,6 +5,7 @@ import re
 from scipy.special import jv, factorial as fac, gammaincc, gamma, sici, hyp0f1
 from mpmath import hyp1f2
 import warnings
+from typing import Optional
 
 @np.vectorize
 def vhyp1f2(a0, b0, b1, x):
@@ -35,7 +36,10 @@ def vec_to_amp(vec):
     return vec if vec.ndim == 1 else np.linalg.norm(vec, axis=1)
 
 
-def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, complex, *args):
+def _perform_convergent_sum(
+    fnc: callable, u: np.ndarray, order: int, chunk_order: int, atol: float,
+    rtol: float, ret_cumsum: bool, complex: bool, *args):
+
     # Set the default order (100 if we're going to convergence, 30 otherwise)
     order = order or (100 if chunk_order else 30)
 
@@ -62,7 +66,7 @@ def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, 
         sm[..., ks] = sm[..., counter-1][..., None] + np.cumsum(fnc(ks[None, ...], u, *args), axis=-1)
         counter += chunk_order
 
-    if counter==order and order >= 2 and not np.allclose(sm[..., -1], sm[..., -2]):
+    if counter == order and order >= 2 and not np.allclose(sm[..., -1], sm[..., -2]):
         warnings.warn("Desired tolerance not reached. Try setting order higher.")
 
     # Restrict to actual calculated terms
@@ -74,7 +78,7 @@ def _perform_convergent_sum(fnc, u, order, chunk_order, atol, rtol, ret_cumsum, 
         return sm[..., -1].squeeze()
 
 
-def monopole(uvecs, order=3):
+def monopole(uvecs: [float, np.ndarray], order: int=3) -> [float, np.ndarray]:
     """
     Solution for I(r) = 1.
 
@@ -82,10 +86,13 @@ def monopole(uvecs, order=3):
 
     Parameters
     ----------
-    uvecs: ndarray of float
-        cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    uvecs: float or ndarray of float
+        The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
+        the baseline. If an array of one dimension, each entry is assumed to be a magnitude.
+        If a 2D array, may have shape (Nbls, 2) or (Nbls, 3). In the first case, w is
+        assumed to be zero.
     order: int
-        Expansion order to use for nonflat array case (w != 0).
+        Expansion order to use for non-flat array case (w != 0).
 
     Returns
     -------
@@ -93,7 +100,7 @@ def monopole(uvecs, order=3):
         Visibilities, shape (Nbls,)
     """
 
-    if uvecs.ndim == 1 or uvecs.shape[1] == 2 or np.allclose(uvecs[:, 2], 0):
+    if np.isscalar(uvecs) or uvecs.ndim == 1 or uvecs.shape[1] == 2 or np.allclose(uvecs[:, 2], 0):
         # w is zero.
         uamps = vec_to_amp(uvecs)
         return 2 * np.pi * np.sinc(2 * uamps)
@@ -106,14 +113,17 @@ def monopole(uvecs, order=3):
     return 2 * np.pi * np.sum(fac0 * fac1, axis=-1)
 
 
-def cosza(uvecs):
+def cosza(uvecs: [float, np.ndarray]) -> [float, np.ndarray]:
     """
     Solution for I(r) = cos(r).
 
     Parameters
     ----------
-    uvecs: ndarray of float
-        cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    uvecs: float or ndarray of float
+        The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
+        the baseline. If an array of one dimension, each entry is assumed to be a magnitude.
+        If a 2D array, may have shape (Nbls, 2) or (Nbls, 3). In the first case, w is
+        assumed to be zero.
 
     Returns
     -------
@@ -124,14 +134,17 @@ def cosza(uvecs):
     return jv(1, 2 * np.pi * uamps) * 1 / uamps
 
 
-def polydome(uvecs, n=2):
+def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
     """
     Solution for I(r) = (1-r^n) * cos(zenith angle).
 
     Parameters
     ----------
-    uvecs: ndarray of float
-        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    uvecs: float or ndarray of float
+        The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
+        the baseline. If an array of one dimension, each entry is assumed to be a magnitude.
+        If a 2D array, may have shape (Nbls, 2) or (Nbls, 3). In the first case, w is
+        assumed to be zero.
     n: int
         Order of polynomial (Default of 2)
         Must be even.
@@ -156,28 +169,35 @@ def polydome(uvecs, n=2):
     return res
 
 
-def projgauss(uvecs, a, order=None, chunk_order=0, usesmall=False, uselarge=False, atol=1e-10, rtol=1e-8, ret_cumsum=False):
+def projgauss(
+    uvecs: [float, np.ndarray], a: float, order: Optional[int]=None, chunk_order: int=0,
+    usesmall: bool=False, uselarge: bool=False, atol: float=1e-10, rtol: float=1e-8,
+    ret_cumsum: bool=False) -> [float, np.ndarray]:
     """
     Solution for I(r) = exp(-r^2/2 a^2) * cos(r).
 
     Parameters
     ----------
-    uvecs: ndarray of float
-        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    uvecs: float or ndarray of float
+        The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
+        the baseline. If an array of one dimension, each entry is assumed to be a magnitude.
+        If a 2D array, may have shape (Nbls, 2) or (Nbls, 3). In the first case, w is
+        assumed to be zero.
     a: float
         Gaussian width parameter.
     order: int
         If not `chunk_order`, the expansion order. Otherwise, this is the *maximum*
         order of the expansion.
     chunk_order: int
-        If non-zero, the expansion will be summed until convergence (or max order is
-        reached).
+        If non-zero, the expansion will be summed (in chunks of ``chunk_order``) until
+        convergence (or max order) is reached. Setting to higher values tends to make
+        the sum more efficient, but can over-step the convergence.
     usesmall: bool, optional
-        Use small-a approximation, regardless of a.
-        Default is False
+        Use small-a expansion, regardless of ``a``. By default, small-a expansion is used
+        for ``a<=0.25``.
     uselarge: bool, optional
-        Use large-a approximation, regardless of a.
-        Default is False
+        Use large-a expansion, regardless of ``a``. By default, large-a expansion is used
+        for ``a >= 0.25``.
     ret_cumsum : bool, optional
         Whether to return the full cumulative sum of the expansion.
 
@@ -214,34 +234,46 @@ def projgauss(uvecs, a, order=None, chunk_order=0, usesmall=False, uselarge=Fals
     return result
 
 
-def gauss(uvecs, a, el0vec=None, order=None, chunk_order=0, usesmall=False, uselarge=False, hyporder=5, atol=1e-10, rtol=1e-8, ret_cumsum=False):
+def gauss(uvecs, a, el0vec=None, order: Optional[int]=None, chunk_order: int=0,
+    usesmall: bool=False, uselarge: bool=False, atol: float=1e-10, rtol: float=1e-8,
+    ret_cumsum: bool=False, hyp_order: int=5) -> [float, np.ndarray]:
     """
     Solution for I(r) = exp(-r^2/2 a^2).
 
-    Parameters
+Parameters
     ----------
-    uvecs: ndarray of float
-        Cartesian baseline vectors in wavelengths, shape (Nbls, 3)
+    uvecs: float or ndarray of float
+        The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
+        the baseline. If an array of one dimension, each entry is assumed to be a magnitude.
+        If a 2D array, may have shape (Nbls, 2) or (Nbls, 3). In the first case, w is
+        assumed to be zero.
     a: float
         Gaussian width parameter.
     el0vec: ndarray of float
         Cartesian vector describing lmn displacement of Gaussian center, shape (3,).
     order: int
-        Expansion order.
+        If not `chunk_order`, the expansion order. Otherwise, this is the *maximum*
+        order of the expansion.
+    chunk_order: int
+        If non-zero, the expansion will be summed (in chunks of ``chunk_order``) until
+        convergence (or max order) is reached. Setting to higher values tends to make
+        the sum more efficient, but can over-step the convergence.
     usesmall: bool, optional
-        Use small-a approximation, regardless of a.
-        Default is False
+        Use small-a expansion, regardless of ``a``. By default, small-a expansion is used
+        for ``a<=0.25``.
     uselarge: bool, optional
-        Use large-a approximation, regardless of a.
-        Default is False
+        Use large-a expansion, regardless of ``a``. By default, large-a expansion is used
+        for ``a >= 0.25``.
+    ret_cumsum : bool, optional
+        Whether to return the full cumulative sum of the expansion.
     hyporder: int, optional
         Expansion order for hypergeometric 1F1 function evaluation.
-        Default is 5.
 
     Returns
     -------
     ndarray of complex
-        Visibilities, shape (Nbls,)
+        Visibilities, shape (Nbls,) (or (Nbls, nk) if `ret_cumsum` is True.)
+
     """
     u_amps = vec_to_amp(uvecs)
 
@@ -260,7 +292,7 @@ def gauss(uvecs, a, el0vec=None, order=None, chunk_order=0, usesmall=False, usel
 
     if usesmall:
         def fnc(ks, v):
-            hypterms = approx_hyp1f1(ks + 1, 3 / 2, -np.pi / a**2, order=hyporder)
+            hypterms = approx_hyp1f1(ks + 1, 3 / 2, -np.pi / a**2, order=hyp_order)
             hypterms = hypterms[None, :]
             series = (np.sqrt(np.pi) * v * a)**(2 * ks) / gamma(ks + 1)
             return series * hypterms
@@ -279,7 +311,7 @@ def gauss(uvecs, a, el0vec=None, order=None, chunk_order=0, usesmall=False, usel
         return (phasor * np.pi ** (3 / 2) * result).squeeze()
 
 
-def xysincs(uvecs, a, xi=0.0):
+def xysincs(uvecs: [np.ndarray], a: float, xi: float=0.0):
     """
     Solution for the xysincs model.
 
