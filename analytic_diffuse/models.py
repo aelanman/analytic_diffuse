@@ -85,13 +85,14 @@ def projected(func):
 
 
 def circsym(func):
-    """Mark a model as defining itself in projected co-ordinates."""
+    """Mark a model as circularly (azimuthally) symmetric."""
     circular_models.append(func.__name__)
 
     @wraps(func)
     def wrapper(az, za, *args, **kwargs):
         return func(None, za, *args, **kwargs)
     return wrapper
+
 
 def _angle_to_lmn(phi, theta):
     phi, theta = np.atleast_1d(phi), np.atleast_1d(theta)
@@ -175,6 +176,20 @@ def projgauss(az: [None, float, np.ndarray], za: [float, np.ndarray], a: float):
 
 
 @circsym
+@sky_model
+def gauss_zenith(az: [None, float, np.ndarray], za: [float, np.ndarray], a: float):
+    """
+    On-zenith Gaussian.
+
+    {params}
+    a: float
+        Gaussian width parameter.
+
+    {other}
+    """
+    return gauss(az, za, a)
+
+
 @sky_model
 def gauss(az: [None, float, np.ndarray], za: [float, np.ndarray], a: float, el0vec: [None, np.ndarray]=None):
     """

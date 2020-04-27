@@ -9,8 +9,8 @@ import numpy as np
      ('polydome', {}),
      ('projgauss', {'a': 0.01}),
      ('projgauss', {'a': 2}),
-     ('gauss', {'a': 0.01}),
-     ('gauss', {'a': 2})
+     ('gauss_zenith', {'a': 0.01}),
+     ('gauss_zenith', {'a': 2})
      ]
 )
 def test_against_hankel(model, kwargs):
@@ -22,7 +22,7 @@ def test_against_hankel(model, kwargs):
     assert np.allclose(anl, num, rtol=1e-8)
 
 
-@pytest.mark.parametrize('a', (0.1, 0.2, 0.25, 0.5))  # 0.2 doesn't seem to work for u=10, 100 (numerical or analytic)
+@pytest.mark.parametrize('a', (0.1, 0.2, 0.25, 0.5))
 def test_projgauss_mid_a(a):
     if a < 0.25:
         u = np.array([0.01, 0.1, 1]) / a
