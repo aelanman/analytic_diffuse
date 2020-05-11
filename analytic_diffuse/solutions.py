@@ -112,6 +112,10 @@ def monopole(uvecs: [float, np.ndarray], order: int=3) -> [float, np.ndarray]:
     fac1 = hyp0f1((3 + ks) / 2, -np.pi**2 * (uvecs[:, 0, :]**2 + uvecs[:, 1, :]**2))
     return 2 * np.pi * np.sum(fac0 * fac1, axis=-1)
 
+def _jinc(n, x):
+    res = jv(n, x) / x
+    res[x == 0] = 1/2
+    return res
 
 def cosza(uvecs: [float, np.ndarray]) -> [float, np.ndarray]:
     """
@@ -131,7 +135,7 @@ def cosza(uvecs: [float, np.ndarray]) -> [float, np.ndarray]:
         Visibilities, shape (Nbls,)
     """
     uamps = vec_to_amp(uvecs)
-    return jv(1, 2 * np.pi * uamps) * 1 / uamps
+    return 2 * np.pi * _jinc(1, 2 * np.pi * uamps)
 
 
 def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
@@ -159,13 +163,16 @@ def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
     uamps = vec_to_amp(uvecs)
 
     # Special case:
+    cosza_soln = 2 * np.pi * _jinc(1, 2 * np.pi * uamps)
     if n == 2:
-        return (jv(1, 2 * np.pi * uamps) * 1 / uamps - (jv(2, 2 * np.pi * uamps)
-                - np.pi * uamps * jv(3, 2 * np.pi * uamps)) * (1 / (np.pi * uamps**2)))
+        res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
+                + np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
+        res[uamps == 0] = np.pi/2
+        return res
     # General
-    res = (1 / (n + 1)) * vhyp1f2(n + 1, 1, n + 2, -np.pi**2 * uamps**2)
-    res[uamps == 0] = 2 * np.pi * n / (2 * n + 2)
-    res = (jv(1, 2 * np.pi * uamps) * 1 / uamps) - res  # V_cosza - result
+    res = vhyp1f2(n // 2 + 1, 1, n // 2 + 2, -np.pi**2 * uamps**2) / (n // 2 + 1)
+    res[uamps == 0] = np.pi * n / (n + 2)
+    res = cosza_soln - res
     return res
 
 

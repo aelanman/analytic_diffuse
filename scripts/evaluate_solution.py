@@ -19,18 +19,17 @@ parser.add_argument('-v', '--visfile', type=str, help='pyuvdata-compatible visib
 parser.add_argument('--infile', type=str, help='Input npz file containing uvw vectors')
 helpstr = 'Model name. Available: ' + ', '.join(andiff.available_models)
 parser.add_argument('--model', type=str, help=helpstr, default=None)
-parser.add_argument('-a', type=float, help='a parameter for gaussian and xysincs models.', default=None)
+parser.add_argument('--a', type=float, help='a parameter for gaussian and xysincs models.', default=None)
 parser.add_argument('--el0vec', type=str, help='(l,m,n) coordinate vector for center displacement from zenith. Comma-delimited string.', default=None, required=False)
 parser.add_argument('--el0ang', type=str, help='(azimuth, zenith angle) coordinate vector for center position.', default=None)
 parser.add_argument('--xi', type=float, help='Xi parameter for xysincs model.', default=None)
-parser.add_argument('-n', type=int, help='Polynomial order for polydome model.', default=None)
+parser.add_argument('--n', type=int, help='Polynomial order for polydome model.', default=None)
 parser.add_argument('--order', type=int, help='Expansion order, for series solutions.')
 parser.add_argument('--amp', type=float, help='Amplitude of the model in. Default is 2 K.', default=2)
 parser.add_argument('--maxu', type=float, help='Maximum baseline length in wavelengths.')
 parser.add_argument('-o', '--ofname', type=str, help='Output npz file name', default=None)
 
 args = parser.parse_args()
-
 
 if args.el0vec is not None:
     args.el0vec = list(map(float, args.el0vec.split(',')))
@@ -116,6 +115,8 @@ if args.ofname is None:
         args.ofname = "ana_comp_"+args.model
     else:
         args.ofname = "ana_eval_"+args.model    # Comp for data comp, eval for just evaluation
+    if 'corr' in args.visfile:
+        args.ofname += '-corr'
     for k, val in params.items():
         if isinstance(val, int):
             args.ofname += '_{}{:d}'.format(k, val)
@@ -127,6 +128,7 @@ if args.ofname is None:
     if 'nside' in uv.extra_keywords.keys():
         args.ofname += '_nside{}'.format(uv.extra_keywords['nside'])
     args.ofname += ".npz"
+
 
 print("Saving results to {}".format(args.ofname))
 np.savez(args.ofname, **outdict)
