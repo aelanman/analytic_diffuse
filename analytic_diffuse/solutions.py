@@ -376,6 +376,9 @@ def parse_filename(fname):
     naming convention. See example files in data directory.
     """
     params = {}
+
+    if 'corr' in fname:
+        fname = fname.replace('-corr', '')
     if 'monopole' in fname:
         sky = 'monopole'
     elif 'cosza' in fname:
