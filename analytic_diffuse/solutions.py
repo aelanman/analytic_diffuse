@@ -166,7 +166,7 @@ def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
     cosza_soln = 2 * np.pi * _jinc(1, 2 * np.pi * uamps)
     if n == 2:
         res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
-                + np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
+                - np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
         res[uamps == 0] = np.pi/2
         return res
     # General
