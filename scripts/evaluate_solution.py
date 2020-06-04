@@ -4,6 +4,8 @@
 
 import numpy as np
 import os
+import warnings
+import sys
 import argparse
 from pyuvdata import UVData
 from healvis.cosmology import c_ms
@@ -27,6 +29,7 @@ parser.add_argument('--n', type=int, help='Polynomial order for polydome model.'
 parser.add_argument('--order', type=int, help='Expansion order, for series solutions.')
 parser.add_argument('--amp', type=float, help='Amplitude of the model in. Default is 2 K.', default=2)
 parser.add_argument('--maxu', type=float, help='Maximum baseline length in wavelengths.')
+parser.add_argument('--getnpzname', help='Just get the npz filename.', action='store_true')
 parser.add_argument('-o', '--ofname', type=str, help='Output npz file name', default=None)
 
 args = parser.parse_args()
@@ -60,26 +63,28 @@ if args.visfile is None:
 elif args.visfile is not None and args.infile is not None:
     raise ValueError("Cannot do both npz and uv input files at once.")
 else:
-    uv.read(args.visfile)
-    print("Using visibility file {}".format(args.visfile))
-    uv.select(times=uv.time_array[0])    # Select first time only.
-    dat = uv.data_array[:,0,:,0]
-    lam = c_ms/uv.freq_array[0]
-    
-    dat_Tsr = dat * jy2Tsr(uv.freq_array[0], bm=1.0)
-    uvw = np.repeat(uv.uvw_array[:,:,None], uv.Nfreqs, axis=2)
-    uvw = np.swapaxes((uvw/lam), 1,2)
-    uvw = uvw.reshape((uv.Nbls * uv.Nfreqs, 3))
-    dat_Tsr = dat_Tsr.flatten()
-    uvw = uvw[sel]
-    dat_Tsr = dat_Tsr[sel]
-    if args.model is None:
-        model, params = andiff.solutions.parse_filename(os.path.basename(args.visfile))
-        args.model = model
-        for k, v in params.items():
-            if (hasattr(args, k)) and (getattr(args, k) is None):
-                setattr(args, k, v)
-    outdict['dat_Tsr'] = dat_Tsr
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        uv.read(args.visfile)
+        print("Using visibility file {}".format(args.visfile))
+        uv.select(times=uv.time_array[0])    # Select first time only.
+        dat = uv.data_array[:,0,:,0]
+        lam = c_ms/uv.freq_array[0]
+        
+        dat_Tsr = dat * jy2Tsr(uv.freq_array[0], bm=1.0)
+        uvw = np.repeat(uv.uvw_array[:,:,None], uv.Nfreqs, axis=2)
+        uvw = np.swapaxes((uvw/lam), 1,2)
+        uvw = uvw.reshape((uv.Nbls * uv.Nfreqs, 3))
+        dat_Tsr = dat_Tsr.flatten()
+        uvw = uvw[sel]
+        dat_Tsr = dat_Tsr[sel]
+        if args.model is None:
+            model, params = andiff.solutions.parse_filename(os.path.basename(args.visfile))
+            args.model = model
+            for k, v in params.items():
+                if (hasattr(args, k)) and (getattr(args, k) is None):
+                    setattr(args, k, v)
+        outdict['dat_Tsr'] = dat_Tsr
 
 
 outdict['uvws'] = uvw
@@ -105,10 +110,12 @@ if ('gauss' in args.model) or ('xysincs' in args.model):
     a = params.pop('a')
     if a is None:
         raise ValueError("Missing parameter 'a' for {}.".format(args.model))
-    outdict['result'] = args.amp * analytic(uvw, a, **params)
+    if not args.getnpzname:
+        outdict['result'] = args.amp * analytic(uvw, a, **params)
     params['a'] = a
 else:
-    outdict['result'] = args.amp * analytic(uvw, **params)
+    if not args.getnpzname:
+        outdict['result'] = args.amp * analytic(uvw, **params)
 
 if args.ofname is None:
     if args.infile is None:
@@ -129,6 +136,9 @@ if args.ofname is None:
         args.ofname += '_nside{}'.format(uv.extra_keywords['nside'])
     args.ofname += ".npz"
 
+if args.getnpzname:
+    print(args.ofname)
+    sys.exit()
 
 print("Saving results to {}".format(args.ofname))
 np.savez(args.ofname, **outdict)

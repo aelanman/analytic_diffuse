@@ -167,7 +167,7 @@ def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
     if n == 2:
         res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
                 - np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
-        res[uamps == 0] = np.pi/2
+        res[uamps == 0] = np.pi / 2
         return res
     # General
     res = vhyp1f2(n // 2 + 1, 1, n // 2 + 2, -np.pi**2 * uamps**2) / (n // 2 + 1)
@@ -376,7 +376,6 @@ def parse_filename(fname):
     naming convention. See example files in data directory.
     """
     params = {}
-
     if 'corr' in fname:
         fname = fname.replace('-corr', '')
     if 'monopole' in fname:
@@ -388,6 +387,7 @@ def parse_filename(fname):
         params['n'] = 2
     elif 'projgauss' in fname:
         sky = 'projgauss'
+        print('\t', fname)
         params['a'] = float(re.search(r'(?<=gauss-)\d*\.?\d*', fname).group(0))
     elif 'fullgauss' in fname:
         sky = 'gauss'
