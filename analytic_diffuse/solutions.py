@@ -287,7 +287,10 @@ Parameters
     if el0vec is not None:
         udotel0 = np.dot(uvecs, el0vec)
         el0 = np.linalg.norm(el0vec)
-        el0_x = (udotel0.T / u_amps).T
+        nz = ~np.isclose(u_amps, 0)
+        el0_x = np.zeros_like(udotel0)
+        el0_x[nz] = (udotel0[nz].T / u_amps[nz]).T
+        el0_x[~nz] = 0  # udotel0 is  undefined in this case
     else:
         udotel0 = 0.0
         el0_x = 0
