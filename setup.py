@@ -16,7 +16,7 @@ setup_args = {
     'packages': ['analytic_diffuse', 'analytic_diffuse.tests'],
     'version': '0.0.1',
     'include_package_data': True,
-    'install_requires': ['numpy', 'scipy'],
+    'install_requires': ['numpy', 'scipy', 'mpmath'],
     'classifiers': ['Development Status :: 3 - Alpha',
                     'Intended Audience :: Science/Research',
                     'License :: OSI Approved :: MIT License',
