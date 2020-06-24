@@ -113,8 +113,11 @@ def monopole(uvecs: [float, np.ndarray], order: int=3) -> [float, np.ndarray]:
     return 2 * np.pi * np.sum(fac0 * fac1, axis=-1)
 
 def _jinc(n, x):
-    res = jv(n, x) / x
-    res[x == 0] = 1/2
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning,
+                                message="invalid value encountered in true_divide")
+        res = jv(n, x) / x
+        res[x == 0] = 1 / 2
     return res
 
 def cosza(uvecs: [float, np.ndarray]) -> [float, np.ndarray]:
@@ -164,15 +167,18 @@ def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
 
     # Special case:
     cosza_soln = 2 * np.pi * _jinc(1, 2 * np.pi * uamps)
-    if n == 2:
-        res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
-                - np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
-        res[uamps == 0] = np.pi / 2
-        return res
-    # General
-    res = vhyp1f2(n // 2 + 1, 1, n // 2 + 2, -np.pi**2 * uamps**2) / (n // 2 + 1)
-    res[uamps == 0] = np.pi * n / (n + 2)
-    res = cosza_soln - res
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning,
+                                message="invalid value encountered in true_divide")
+        if n == 2:
+            res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
+                    - np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
+            res[uamps == 0] = np.pi / 2
+            return res
+        # General
+        res = vhyp1f2(n // 2 + 1, 1, n // 2 + 2, -np.pi**2 * uamps**2) / (n // 2 + 1)
+        res[uamps == 0] = np.pi * n / (n + 2)
+        res = cosza_soln - res
     return res
 
 
