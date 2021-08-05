@@ -253,7 +253,7 @@ def gauss(uvecs, a, el0vec=None, order: Optional[int]=None, chunk_order: int=0,
     """
     Solution for I(r) = exp(-r^2/2 a^2).
 
-Parameters
+    Parameters
     ----------
     uvecs: float or ndarray of float
         The cartesian baselines in units of wavelengths. If a float, assumed to be the magnitude of
@@ -320,7 +320,10 @@ Parameters
     result = _perform_convergent_sum(fnc, u_in_series, order, chunk_order, atol, rtol, ret_cumsum, complex=True)
 
     if usesmall:
+#        import IPython; IPython.embed()
         phasor = np.exp(-2 * np.pi * 1j * udotel0) * np.exp(-np.pi * a ** 2 * u_amps ** 2)
+        if ret_cumsum:
+            phasor = phasor[:, None]
         return (2 * np.pi * phasor * result).squeeze()
     else:
         phasor = np.exp(-np.pi * el0 ** 2 / a ** 2)

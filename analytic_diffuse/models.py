@@ -94,6 +94,11 @@ def circsym(func):
     return wrapper
 
 
+def _lmn_to_angle(lmn):
+    phi = np.arctan2(lmn[:, 0], lmn[:, 1])
+    theta = np.arccos(lmn[:, 2])
+    return phi, theta
+
 def _angle_to_lmn(phi, theta):
     phi, theta = np.atleast_1d(phi), np.atleast_1d(theta)
     lmn = np.zeros((len(phi), 3), dtype=float)
@@ -101,7 +106,6 @@ def _angle_to_lmn(phi, theta):
     lmn[:, 1] = np.cos(phi) * np.sin(theta)
     lmn[:, 2] = np.cos(theta)
     return lmn
-
 
 @circsym
 @sky_model

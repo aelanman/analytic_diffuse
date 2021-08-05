@@ -33,3 +33,18 @@ def test_projgauss_mid_a(a):
     num = integrators.hankel_solver('projgauss', u, quad_kwargs=dict(epsabs=0, limit=1000, epsrel=1e-8), use_points=True, a=a)
 
     assert np.allclose(anl, num, rtol=1e-8)
+
+
+def test_gauss_offzen_small():
+    #a = 2.05
+    a = 5e-3
+    el0 = np.array([np.sin(np.radians(89)),0,0])
+    kwargs = {"a": a, "el0vec": el0}
+
+    u = np.linspace(1, 10, 5) 
+    v = u.copy()
+
+    num = np.asarray(integrators.dbl_int_solver('gauss', u, v, **kwargs))
+    anl = get_solution('gauss')(np.vstack((u, v, np.zeros_like(v))).T, **kwargs)
+    import IPython; IPython.embed()
+    print(anl, num)

@@ -6,6 +6,35 @@ import mpmath as mp
 from typing import Optional
 
 
+def dbl_int_solver(model: [callable, str], u: [float, np.ndarray], v: [float, np.ndarray], *args, **kwargs):
+   # u, v = map(np.ndarray.flatten, np.meshgrid(u, v))
+    uvws_in = np.vstack((u,v, np.zeros_like(u))).T
+
+    if callable(model):
+        assert model.__name__ in models.sky_models
+    else:
+        assert model in models.sky_models
+        model = getattr(models, model)
+    
+    def integrand(l, m, uvw, real=True):
+        # lm = (l, m) coords (convert to az,za)
+        lmn = np.vstack((l, m, np.sqrt(1 - l**2 - m**2))).T
+        az, za = models._lmn_to_angle(lmn)
+        fr_func = np.cos if real else np.sin
+        fringe = fr_func(2 * np.pi * np.dot(lmn, uvw)) / lmn[:, 2]
+        return (model(az, za, *args, **kwargs) * fringe).astype(float).flatten()
+
+    res = [
+        integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=True), -1, 1,
+                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))[0] \
+        + 1j * integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=False), -1, 1,
+                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))[0]
+    for uvw in uvws_in]
+
+    return res
+
+
+
 def hankel_solver(model: [callable, str], u: [float, np.ndarray], quad_kwargs: Optional[dict]=None,
                   high_precision: bool=False, use_points: bool=False, *args, **kwargs):
     """
