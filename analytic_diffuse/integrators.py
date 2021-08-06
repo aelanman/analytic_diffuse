@@ -6,7 +6,7 @@ import mpmath as mp
 from typing import Optional
 
 
-def dbl_int_solver(model: [callable, str], u: [float, np.ndarray], v: [float, np.ndarray], *args, **kwargs):
+def dbl_int_solver(model: [callable, str], u: [float, np.ndarray], v: [float, np.ndarray], return_error=False, *args, **kwargs):
    # u, v = map(np.ndarray.flatten, np.meshgrid(u, v))
     uvws_in = np.vstack((u,v, np.zeros_like(u))).T
 
@@ -21,17 +21,23 @@ def dbl_int_solver(model: [callable, str], u: [float, np.ndarray], v: [float, np
         lmn = np.vstack((l, m, np.sqrt(1 - l**2 - m**2))).T
         az, za = models._lmn_to_angle(lmn)
         fr_func = np.cos if real else np.sin
-        fringe = fr_func(2 * np.pi * np.dot(lmn, uvw)) / lmn[:, 2]
+        fringe = fr_func(-2 * np.pi * np.dot(lmn, uvw)) / lmn[:, 2]
         return (model(az, za, *args, **kwargs) * fringe).astype(float).flatten()
 
-    res = [
-        integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=True), -1, 1,
-                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))[0] \
-        + 1j * integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=False), -1, 1,
-                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))[0]
-    for uvw in uvws_in]
+    results = []
+    errors = []
+    for uvw in uvws_in:
+        res_real = integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=True), -1, 1,
+                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))
 
-    return res
+        res_imag = integrate.dblquad(lambda x,y: integrand(x,y, uvw, real=False), -1, 1,
+                          gfun=lambda x: -np.sqrt(1-x**2), hfun=lambda x: np.sqrt(1 - x**2))
+        results.append(res_real[0] + 1j * res_imag[0])
+        errors.append(res_real[1] + 1j * res_imag[1])
+
+    if return_error:
+        return results, errors
+    return results
 
 
 
