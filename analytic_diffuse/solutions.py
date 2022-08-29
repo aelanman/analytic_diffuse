@@ -116,6 +116,8 @@ def _jinc(n, x):
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning,
                                 message="invalid value encountered in true_divide")
+        warnings.filterwarnings('ignore', category=RuntimeWarning,
+                                message="invalid value encountered in divide")
         res = jv(n, x) / x
         res[x == 0] = 1 / 2
     return res
@@ -170,6 +172,8 @@ def polydome(uvecs: [float, np.ndarray], n: int=2) -> [float, np.ndarray]:
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning,
                                 message="invalid value encountered in true_divide")
+        warnings.filterwarnings('ignore', category=RuntimeWarning,
+                                message="invalid value encountered in divide")
         if n == 2:
             res = (cosza_soln - (jv(2, 2 * np.pi * uamps)
                     - np.pi * uamps * jv(3, 2 * np.pi * uamps))  / (np.pi * uamps**2))
